@@ -22,7 +22,7 @@ public class MovementsCredits {
 	@Id
 	private String id;
 	
-	private String MovementsCreditCode;
+	private String movementsCreditCode;
 	
 	// Monto
 	private double amount;

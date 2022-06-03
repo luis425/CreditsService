@@ -39,7 +39,7 @@ public class MovementsCreditsController {
 	private String codigoValidatorCredit;
 
 	@PostMapping(value = "/pay")
-	public Mono<MovementsCredits> Pay(@RequestBody MovementsCredits movementsCredits) {
+	public Mono<MovementsCredits> pay(@RequestBody MovementsCredits movementsCredits) {
 
 		boolean validationvalue = this.validationRegisterRequest(movementsCredits);
 
