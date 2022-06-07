@@ -6,16 +6,16 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.nttdata.Semana01.Credits.DTO.BankAccounts;
-import com.nttdata.Semana01.Credits.DTO.Customer;
+import com.nttdata.Semana01.Credits.DTO.BankAccounts; 
+import com.nttdata.Semana01.Credits.response.CustomerResponse;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
-@AllArgsConstructor
-@Document
+@AllArgsConstructor 
 @Data
+@Document
 @Builder
 public class Credits {
 
@@ -41,7 +41,7 @@ public class Credits {
 	// Estado
 	private boolean statusAccount;
 
-	private Customer customer;
+	private CustomerResponse customer;
 
 	// Relacionar con Cuenta
 	private boolean statusRelationAccount;

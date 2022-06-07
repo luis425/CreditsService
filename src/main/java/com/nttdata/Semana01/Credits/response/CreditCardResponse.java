@@ -1,24 +1,23 @@
-package com.nttdata.Semana01.Credits.Entity;
+package com.nttdata.Semana01.Credits.response;
 
 import java.util.Date;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-
-import com.fasterxml.jackson.annotation.JsonFormat;   
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.nttdata.Semana01.Credits.Entity.Credits;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-
+@Getter
+@Setter
+@NoArgsConstructor
 @AllArgsConstructor
-@Document
-@Data
 @Builder
-public class CreditCard {
-
-	@Id
+public class CreditCardResponse {
+	
 	private String id; 
 
 	private String numberCreditCard;
@@ -41,3 +40,4 @@ public class CreditCard {
 	private Credits credits;
 	
 }
+

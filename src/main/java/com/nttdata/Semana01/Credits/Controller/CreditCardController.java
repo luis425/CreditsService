@@ -6,8 +6,10 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,7 +21,10 @@ import com.nttdata.Semana01.Credits.DTO.Bank;
 import com.nttdata.Semana01.Credits.DTO.Customer;
 import com.nttdata.Semana01.Credits.DTO.CustomerType;
 import com.nttdata.Semana01.Credits.Entity.CreditCard;
+import com.nttdata.Semana01.Credits.Entity.Credits; 
 import com.nttdata.Semana01.Credits.Service.CreditCardService;
+import com.nttdata.Semana01.Credits.Service.CreditsService;
+import com.nttdata.Semana01.Credits.response.CreditCardResponse;
 
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
@@ -32,8 +37,11 @@ public class CreditCardController {
 
 	@Autowired
 	CreditCardService creditCardService;
+	
+	@Autowired
+	CreditsService creditsService;
 
-	private String codigoValidatorCustomer = "";
+	private String codigoValidatorCredit = "";
 
 	@PostMapping
 	public Mono<CreditCard> createCreditCard(@RequestBody CreditCard creditCard) {
@@ -42,39 +50,29 @@ public class CreditCardController {
 
 		if (validationvalue) {
 
-			try {
+			try { 
+				
+				var credits = this.creditsService.getAllCreditsByNumberAccount(creditCard.getCredits().getNumberCredits());
 
-				List<Customer> customerList = new ArrayList<>();
+				List<Credits> listCredits = new ArrayList<>();
 
-				/*
-				 //Descomentar para consumir Servicio de CustomerService
-				  
-				 // Sin mock
-				  
-				  Flux<Customer> customerServiceClientResponse = this.creditCardService
-				  .comunicationWebClientObtenerCustomerbyDni(creditCard.getCustomer().getDniCustomer(
-				  ));
-				  
-				  customerServiceClientResponse.collectList().subscribe(customerList::addAll);
-				  
-				*/
-
-				// Con Mock
-
-				customerList = this.comunicationWebClientObtenerCustomerMock();
-				 
-
+				credits.collectList().subscribe(listCredits::addAll); 
+				
 				long temporizador = (5 * 1000);
 				Thread.sleep(temporizador);
 
-				log.info("Obtener valor para validar Id --->" + customerList);
+				codigoValidatorCredit = this.validardorCustomer(listCredits, creditCard);
 
-				codigoValidatorCustomer = this.validardorCustomer(customerList, creditCard);
-
-				if (codigoValidatorCustomer.equals("")) {
+				if (codigoValidatorCredit.equals("")) {
 					return Mono.error(new ResponseStatusException(HttpStatus.PRECONDITION_FAILED,
-							"El Customer no existe, para realizar la relacion con la CreditCard"));
+							"No existe Cuenta de Credito, para realizar la relacion con la CreditCard"));
 				} else {
+					
+					creditCard.setKeyCredit(listCredits.get(0).getKeyCredit());
+					creditCard.setAvailableBalanceCreditCard(listCredits.get(0).getAvailableBalanceCredit());
+					creditCard.setAvailableBalanceCreditCardMaximum(listCredits.get(0).getAvailableBalanceCreditMaximum());
+					creditCard.setStatusAccount(true);
+					creditCard.setDateCreationCreditCard(new Date());
 					return this.creditCardService.createCreditCard(creditCard);
 				}
 
@@ -104,6 +102,36 @@ public class CreditCardController {
 
 	}
 
+	@GetMapping(value = "/creditCardbynumbercreditCardResponse/{numbercreditCard}")
+	public Mono<ResponseEntity<CreditCardResponse>> getAllCreditCardBynumbercreditCardResponse(@PathVariable String numbercreditCard) {
+
+		try {
+
+			Flux<CreditCardResponse> creditcardflux = this.creditCardService.getAllCreditCardBynumbercreditCardResponse(numbercreditCard);
+
+			List<CreditCardResponse> list1 = new ArrayList<>();
+
+			creditcardflux.collectList().subscribe(list1::addAll);
+
+			long temporizador = (5 * 1000);
+
+			Thread.sleep(temporizador);
+
+			if (list1.isEmpty()) {
+				return null;
+
+			} else {
+				return Mono.just(ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(list1.get(0)))
+						.defaultIfEmpty(ResponseEntity.notFound().build());
+			}
+
+		} catch (InterruptedException e) {
+			log.info(e.toString());
+			Thread.currentThread().interrupt();
+			return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage()));
+		}
+	}
+	
 	public boolean validationRegisterCreditCardRequest(CreditCard creditCard) {
 
 		boolean validatorCreditCard;
@@ -112,15 +140,13 @@ public class CreditCardController {
 			validatorCreditCard = false;
 		} else if (creditCard.getNumberCreditCard() == null || creditCard.getNumberCreditCard().equals("")) {
 			validatorCreditCard = false;
-		} else if (creditCard.getKeyCredit() == 0) {
+		} else if (creditCard.getKeyCredit() != 0) {
 			validatorCreditCard = false;
-		} else if (creditCard.getAvailableBalanceCreditCard() == 0) {
+		} else if (creditCard.getAvailableBalanceCreditCard() != 0) {
 			validatorCreditCard = false;
-		} else if (creditCard.getAvailableBalanceCreditCardMaximum() == 0) {
+		} else if (creditCard.getAvailableBalanceCreditCardMaximum() != 0) {
 			validatorCreditCard = false;
-		} else if (!creditCard.isStatusAccount()) {
-			validatorCreditCard = false;
-		} else if (creditCard.getCustomer() == null || creditCard.getCustomer().getDniCustomer().equals("")) {
+		} else if (creditCard.getCredits() == null || creditCard.getCredits().getNumberCredits().equals("")) {
 			validatorCreditCard = false;
 		} else {
 			validatorCreditCard = true;
@@ -129,20 +155,25 @@ public class CreditCardController {
 		return validatorCreditCard;
 	}
 
-	public String validardorCustomer(List<Customer> customers, CreditCard creditCard) {
+	public String validardorCustomer(List<Credits> credit, CreditCard creditCard) {
 
-		if (customers.isEmpty()) {
-			codigoValidatorCustomer = "";
+		if (credit.isEmpty()) {
+			
+			codigoValidatorCredit = "";
+		
 		} else {
-			codigoValidatorCustomer = customers.get(0).getDniCustomer();
+			
+			log.info("Obtener valor para validar Id --->" + credit.get(0).getNumberCredits());
+			
+			codigoValidatorCredit = credit.get(0).getNumberCredits();
 
 			// Setear Valor de Customer al Request para el registro
 
-			creditCard.setCustomer(customers.get(0));
+			creditCard.setCredits(credit.get(0));
 
 		}
 
-		return codigoValidatorCustomer;
+		return codigoValidatorCredit;
 	}
 
 	// Metodo para Mock

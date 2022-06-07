@@ -23,6 +23,8 @@ import com.nttdata.Semana01.Credits.Entity.Credits;
 import com.nttdata.Semana01.Credits.Entity.TypeCredits;
 import com.nttdata.Semana01.Credits.Service.CreditsService;
 import com.nttdata.Semana01.Credits.Service.TypeCreditsService;
+import com.nttdata.Semana01.Credits.response.BankAccountResponse;
+import com.nttdata.Semana01.Credits.response.CustomerResponse;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
@@ -59,12 +61,17 @@ public class CreditsController {
 
 		boolean validationvalue = this.validationRegisterRequest(credits);
 
-		List<BankAccounts> listBankAccounts = new ArrayList<>();
-
 		if (validationvalue) {
 
-			List<Customer> listCustomer = new ArrayList<>();
-
+			BankAccountResponse  endpointResponseBankAccount = new BankAccountResponse();
+			/* 
+			 
+			 List<BankAccounts> listBankAccounts = new ArrayList<>();
+				
+			List<Customer> listCustomer = new ArrayList<>();			
+						
+						---- LLamado con Webclient Customer  -----------
+			
 			Mono<Customer> endpointCustomerResponse = customerServiceClient.get()
 					.uri("/customer/".concat(credits.getCustomer().getCodeCustomer()))
 					.accept(MediaType.APPLICATION_JSON).retrieve().bodyToMono(Customer.class).log()
@@ -73,33 +80,43 @@ public class CreditsController {
 					});
 
 			endpointCustomerResponse.flux().collectList().subscribe(listCustomer::addAll);
-
+			
+			*/
+			
+			CustomerResponse  endpointResponseCustomer = this.creditsService.comunicationWebClientCustomerObtenerCustomerbyDniResponse(credits.getCustomer().getDniCustomer());
+			
 			var typeCredits = this.typeCreditsService.getTypeCreditsbyId(credits.getTypeCredits().getId());
 
 			List<TypeCredits> listTypeCredits = new ArrayList<>();
 
 			typeCredits.flux().collectList().subscribe(listTypeCredits::addAll);
 
-			long temporizador = (8 * 1000);
-			Thread.sleep(temporizador);
+			long temporizador = (5 * 1000); 
 
 			if (credits.isStatusRelationAccount()) {
 
-				Mono<BankAccounts> endpointResponse = bankAccountsServiceClient.get()
-						.uri("/bankAccounts/".concat(credits.getBankAccounts().getNumberAccount()))
-						.accept(MediaType.APPLICATION_JSON).retrieve().bodyToMono(BankAccounts.class).log()
-						.doOnError(ex -> {
-							throw new RuntimeException("the exception message is - " + ex.getMessage());
-						});
-
-				endpointResponse.flux().collectList().subscribe(listBankAccounts::addAll);
+				/* 
+				    ---- LLamado con Webclient BankAccount  -----------
+				    
+					Mono<BankAccounts> endpointResponse = bankAccountsServiceClient.get()
+							.uri("/bankAccounts/".concat(credits.getBankAccounts().getNumberAccount()))
+							.accept(MediaType.APPLICATION_JSON).retrieve().bodyToMono(BankAccounts.class).log()
+							.doOnError(ex -> {
+								throw new RuntimeException("the exception message is - " + ex.getMessage());
+							});
+	
+					endpointResponse.flux().collectList().subscribe(listBankAccounts::addAll);
+				*/
+				
+				endpointResponseBankAccount = this.creditsService.comunicationWebClientBankAccountObtenerBankAccountbyNumberAccountResponse(credits.getBankAccounts().getNumberAccount());
+				
 			}
 
 			try {
 
 				Thread.sleep(temporizador);
 
-				codigoValidatorCustomer = this.validardorCustomer(listCustomer, credits);
+				codigoValidatorCustomer = this.validardorCustomer(endpointResponseCustomer, credits);
 
 				log.info("Validar Codigo Repetido --->" + codigoValidatorCustomer);
 
@@ -109,7 +126,7 @@ public class CreditsController {
 
 				if (codigoValidatorCustomer.equals("")) {
 					return Mono.error(new ResponseStatusException(HttpStatus.PRECONDITION_FAILED,
-							"El Codigo de Customer no existe"));
+							"El Customer no existe"));
 				}
 
 				if (codigoValidatorTypeCredits == 0) {
@@ -119,11 +136,11 @@ public class CreditsController {
 
 				if (credits.isStatusRelationAccount()) {
 
-					codigoValidatorNumberBankAccount = this.validardorBankAccount(listBankAccounts, credits);
+					codigoValidatorNumberBankAccount = this.validardorBankAccount(endpointResponseBankAccount, credits);
 
 					log.info("Obtener valor para validar Id --->" + codigoValidatorNumberBankAccount);
 
-					if (codigoValidatorCustomer.equals("")) {
+					if (codigoValidatorNumberBankAccount.equals("")) {
 						return Mono.error(new ResponseStatusException(HttpStatus.PRECONDITION_FAILED,
 								"El Codigo que se intenta relacion a una Cuenta Bancaria no existe"));
 					}
@@ -136,7 +153,7 @@ public class CreditsController {
 
 					// Credito Personal
 
-					if (listCustomer.get(0).getCustomertype().getId().equals(1)) {
+					if (endpointResponseCustomer.getCustomertype().getId().equals(1)) {
 
 						if (credits.isStatusRelationAccount()) {
 
@@ -157,9 +174,8 @@ public class CreditsController {
 								credits.setDateCreationCredit(new Date());
 								credits.setStatusAccount(true);
 								credits.setStatusRelationAccount(true);
-								credits.setAvailableBalanceCreditMaximum(
-										listBankAccounts.get(0).getAvailableBalanceAccount());
-								credits.setAvailableBalanceCredit(listBankAccounts.get(0).getAvailableBalanceAccount());
+								credits.setAvailableBalanceCreditMaximum(endpointResponseBankAccount.getAvailableBalanceAccount());
+								credits.setAvailableBalanceCredit(endpointResponseBankAccount.getAvailableBalanceAccount());
 
 								return this.creditsService.createCredits(credits);
 
@@ -189,6 +205,7 @@ public class CreditsController {
 								credits.setStatusRelationAccount(false);
 								credits.setBankAccounts(null);
 								credits.setAvailableBalanceCredit(credits.getAvailableBalanceCreditMaximum());
+								credits.setAvailableBalanceCreditMaximum(credits.getAvailableBalanceCreditMaximum());
 
 								return this.creditsService.createCredits(credits);
 
@@ -203,18 +220,17 @@ public class CreditsController {
 								"El cliente que se quiere asociar no es un tipo de Cliente Personal"));
 					}
 
-				} else if (listCustomer.get(0).getCustomertype().getId().equals(2)) {
+				} else if (endpointResponseCustomer.getCustomertype().getId().equals(2)) {
 
-					if (listCustomer.get(0).getCustomertype().getId().equals(2)) {
+					if (endpointResponseCustomer.getCustomertype().getId().equals(2)) {
 
 						if (credits.isStatusRelationAccount()) {
 
 							credits.setDateCreationCredit(new Date());
 							credits.setStatusAccount(true);
 							credits.setStatusRelationAccount(true);
-							credits.setAvailableBalanceCreditMaximum(
-									listBankAccounts.get(0).getAvailableBalanceAccount());
-							credits.setAvailableBalanceCredit(listBankAccounts.get(0).getAvailableBalanceAccount());
+							credits.setAvailableBalanceCreditMaximum(endpointResponseBankAccount.getAvailableBalanceAccount());
+							credits.setAvailableBalanceCredit(endpointResponseBankAccount.getAvailableBalanceAccount());
 
 							return this.creditsService.createCredits(credits);
 
@@ -227,6 +243,7 @@ public class CreditsController {
 							credits.setStatusRelationAccount(false);
 							credits.setBankAccounts(null);
 							credits.setAvailableBalanceCredit(credits.getAvailableBalanceCreditMaximum());
+							credits.setAvailableBalanceCreditMaximum(credits.getAvailableBalanceCreditMaximum());
 
 							return this.creditsService.createCredits(credits);
 
@@ -244,8 +261,8 @@ public class CreditsController {
 						credits.setDateCreationCredit(new Date());
 						credits.setStatusAccount(true);
 						credits.setStatusRelationAccount(true);
-						credits.setAvailableBalanceCreditMaximum(listBankAccounts.get(0).getAvailableBalanceAccount());
-						credits.setAvailableBalanceCredit(listBankAccounts.get(0).getAvailableBalanceAccount());
+						credits.setAvailableBalanceCreditMaximum(endpointResponseBankAccount.getAvailableBalanceAccount());
+						credits.setAvailableBalanceCredit(endpointResponseBankAccount.getAvailableBalanceAccount());
 
 						return this.creditsService.createCredits(credits);
 
@@ -258,6 +275,7 @@ public class CreditsController {
 						credits.setStatusRelationAccount(false);
 						credits.setBankAccounts(null);
 						credits.setAvailableBalanceCredit(credits.getAvailableBalanceCreditMaximum());
+						credits.setAvailableBalanceCreditMaximum(credits.getAvailableBalanceCreditMaximum());
 
 						return this.creditsService.createCredits(credits);
 
@@ -316,8 +334,8 @@ public class CreditsController {
 				// Se agrego la validacion por el motivo que se tomara el saldo maximo del
 				// Credito
 				validatorbankAccounts = false;
-			} else if (credits.getCustomer().getCodeCustomer() == null
-					|| credits.getCustomer().getCodeCustomer().equals("")) {
+			} else if (credits.getCustomer().getDniCustomer() == null
+					|| credits.getCustomer().getDniCustomer().equals("")) {
 				validatorbankAccounts = false;
 			} else {
 				validatorbankAccounts = true;
@@ -340,8 +358,8 @@ public class CreditsController {
 				// Se agrego la validacion por el motivo que se tomara el saldo maximo del
 				// Credito
 				validatorbankAccounts = false;
-			} else if (credits.getCustomer().getCodeCustomer() == null
-					|| credits.getCustomer().getCodeCustomer().equals("")) {
+			} else if (credits.getCustomer().getDniCustomer() == null
+					|| credits.getCustomer().getDniCustomer().equals("")) {
 				validatorbankAccounts = false;
 			} else {
 				validatorbankAccounts = true;
@@ -352,25 +370,21 @@ public class CreditsController {
 		return validatorbankAccounts;
 	}
 
-	public String validardorCustomer(List<Customer> list1, Credits credits) {
+	public String validardorCustomer(CustomerResponse  endpointResponseCustomer, Credits credits) {
 
-		if (list1.isEmpty()) {
+		if (endpointResponseCustomer == null) {
 			codigoValidatorCustomer = "";
 		} else {
-			codigoValidatorCustomer = list1.get(0).getCodeCustomer();
+			codigoValidatorCustomer = endpointResponseCustomer.getCodeCustomer();
 
-			credits.getCustomer().setId(list1.get(0).getId());
+			credits.getCustomer().setId(endpointResponseCustomer.getId());
 			credits.getCustomer().setCodeCustomer(codigoValidatorCustomer);
-			credits.getCustomer().setNameCustomer(list1.get(0).getNameCustomer());
-			credits.getCustomer().setLastNameCustomer(list1.get(0).getLastNameCustomer());
-			credits.getCustomer().setDirectionCustomer(list1.get(0).getDirectionCustomer());
-			credits.getCustomer().setEmailCustomer(list1.get(0).getEmailCustomer());
-			credits.getCustomer().setPhoneNumberCustomer(list1.get(0).getPhoneNumberCustomer());
-			credits.getCustomer().setDniCustomer(list1.get(0).getDniCustomer());
-			credits.getCustomer().setCustomertype(list1.get(0).getCustomertype());
-			credits.getCustomer().setBank(list1.get(0).getBank());
-			credits.getCustomer().setBirthDateCustomer(list1.get(0).getBirthDateCustomer());
-			credits.getCustomer().setRegisterDateCustomer(list1.get(0).getRegisterDateCustomer());
+			credits.getCustomer().setNameCustomer(endpointResponseCustomer.getNameCustomer());
+			credits.getCustomer().setLastNameCustomer(endpointResponseCustomer.getLastNameCustomer()); 
+			credits.getCustomer().setCustomertype(endpointResponseCustomer.getCustomertype());
+			credits.getCustomer().setBank(endpointResponseCustomer.getBank());
+			
+			log.info(" Validar Lista para el Request BankAccount ---> " + endpointResponseCustomer);
 
 		}
 
@@ -390,26 +404,24 @@ public class CreditsController {
 		return codigoValidatorTypeCredits;
 	}
 
-	public String validardorBankAccount(List<BankAccounts> list1, Credits credits) {
+	public String validardorBankAccount(BankAccountResponse endpointResponseBankAccount, Credits credits) {
 
-		if (list1.isEmpty()) {
+		if (endpointResponseBankAccount == null) {
 			codigoValidatorNumberBankAccount = "";
 		} else {
-			codigoValidatorNumberBankAccount = list1.get(0).getNumberAccount();
+			codigoValidatorNumberBankAccount = endpointResponseBankAccount.getNumberAccount();
 
-			credits.getBankAccounts().setId(list1.get(0).getId());
-			credits.getBankAccounts().setTypeBankAccounts(list1.get(0).getTypeBankAccounts());
+			credits.getBankAccounts().setId(endpointResponseBankAccount.getId());
+			credits.getBankAccounts().setTypeBankAccounts(endpointResponseBankAccount.getTypeBankAccounts());
 			credits.getBankAccounts().setNumberAccount(codigoValidatorNumberBankAccount);
-			credits.getBankAccounts().setKeyAccount(list1.get(0).getKeyAccount());
-			credits.getBankAccounts().setAvailableBalanceAccount(list1.get(0).getAvailableBalanceAccount());
-			credits.getBankAccounts().setDateCreationBankAccount(list1.get(0).getDateCreationBankAccount());
-			credits.getBankAccounts().setDateLastBankAccount(list1.get(0).getDateLastBankAccount());
-			credits.getBankAccounts().setStatusAccount(list1.get(0).isStatusAccount());
-			credits.getBankAccounts().setCustomer(list1.get(0).getCustomer());
-
+			credits.getBankAccounts().setKeyAccount(endpointResponseBankAccount.getKeyAccount());
+			credits.getBankAccounts().setAvailableBalanceAccount(endpointResponseBankAccount.getAvailableBalanceAccount()); 
+			credits.getBankAccounts().setDateLastBankAccount(endpointResponseBankAccount.getDateLastBankAccount());
+			credits.getBankAccounts().setStatusAccount(endpointResponseBankAccount.isStatusAccount());
+			credits.getBankAccounts().setCustomer(endpointResponseBankAccount.getCustomer()); 
 		}
 
-		return codigoValidatorCustomer;
+		return codigoValidatorNumberBankAccount;
 	}
 	
 	public Mono<Credits> creditsContacttoService(Throwable ex) { 

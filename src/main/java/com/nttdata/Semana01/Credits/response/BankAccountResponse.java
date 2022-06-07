@@ -1,25 +1,23 @@
-package com.nttdata.Semana01.Credits.DTO;
+package com.nttdata.Semana01.Credits.response;
 
 import java.util.Date;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.nttdata.Semana01.Credits.response.CustomerResponse;
+import com.fasterxml.jackson.annotation.JsonFormat; 
+import com.nttdata.Semana01.Credits.DTO.TypeBankAccounts;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder; 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.ToString;
 
-@AllArgsConstructor
-@NoArgsConstructor
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
-@ToString
-public class BankAccounts {
-	 
+public class BankAccountResponse {
+
 	private String id;
 	
 	private TypeBankAccounts typeBankAccounts;
@@ -31,10 +29,7 @@ public class BankAccounts {
 	
 	// Monto Dispoible de la cuenta
 	private double availableBalanceAccount;
-	 
-	@JsonFormat(pattern="dd-MM-yyyy" , timezone="GMT-05:00")
-	private Date dateCreationBankAccount;
-	
+	  
 	// Postman enviar 2022-05-16T08:55:17.688+00:00
 	@JsonFormat(pattern="dd-MM-yyyy" , timezone="GMT-05:00")
 	private Date dateLastBankAccount;
@@ -43,6 +38,4 @@ public class BankAccounts {
 	private boolean statusAccount; 
 	
 	private CustomerResponse customer;
-	
-
 }

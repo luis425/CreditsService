@@ -70,10 +70,10 @@ public class MovementsCreditsController {
 
 					if (list1.get(0).getKeyCredit() == movementsCredits.getCredits().getKeyCredit()) {
 
-						if (movementsCredits.getAmount() > list1.get(0).getAvailableBalanceCreditMaximum()) {
+						if (movementsCredits.getAmount() > list1.get(0).getAvailableBalanceCredit()) {
 
 							return Mono.error(new ResponseStatusException(HttpStatus.PRECONDITION_FAILED,
-									"Excede su limite de Credito"));
+									"Excede su limite de Credito que dispone. "));
 						} else {
 
 							log.info("Verificar Valor Boolean -->" + list1.get(0).isStatusAccount());
@@ -85,7 +85,7 @@ public class MovementsCreditsController {
 							Credits updateBankAccounts = this.validationUpdateCreditsRequest(list1,
 									movementsCredits.getCredits());
 
-							this.creditsService.createCredits(updateBankAccounts);
+							this.creditsService.createCredits(updateBankAccounts).subscribe();
 
 							movementsCredits.setMovementsCreditCode(UUID.randomUUID().toString());
 
